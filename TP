@@ -1,0 +1,132 @@
+from cmu_graphics import *
+import math
+
+class Game:
+    def __init__(self):
+        self.mode = None
+
+class Player:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+        self.bullets = []
+    
+    def addBullets(self):
+        self.bullets.append([self.x-7, self.y])
+        self.bullets.append([self.x+7, self.y])
+    
+    def moveBullets(self):
+        for bullet in self.bullets:
+            bullet[1] -= 3
+        
+class Enemy:
+    def __init__(self, x, y, size):
+        self.x, self.y = x, y
+        self.moveRight = True
+        self.size = size
+        self.bullets = []
+
+    def move(self):
+        if self.moveRight == True:
+            self.x += 1
+            if self.x >= 600: self.moveRight = False
+        if self.moveRight == False:
+            self.x -= 1
+            if self.x <= 0: self.moveRight = True
+
+    def addBullets(self):
+        self.bullets.append([self.x-10, self.y])
+        self.bullets.append([self.x+10, self.y])
+    
+    def moveBullets(self):
+        for bullet in self.bullets:
+            bullet[1] += 3
+
+class Enemies:
+    def __init__(self):
+        self.enemies = []
+    
+    def addEnemy(self, enemyX, enemyY, size):
+        self.enemies.append(Enemy(enemyX, enemyY, size))
+
+class Skill:
+    ...
+
+class Score:
+    ...
+
+def onAppStart(app):
+    #app
+    app.onStepCounter = 0
+    app.paused = False
+    #ships
+    app.playerShip = Player(app.width/2, app.height*(3/4))
+    app.enemyShips = Enemies()
+    #game mode
+    app.gamemode = None
+
+def redrawAll(app):
+    #draw player ship
+    drawPlayer(app)
+    #draw enemy ships
+    drawEnemies(app)
+    #draw bullets
+    drawBullets(app)
+
+def drawPlayer(app):
+    drawCircle(app.playerShip.x, app.playerShip.y, 10, fill='green')
+
+def drawEnemies(app):
+    for enemy in app.enemyShips.enemies:
+        drawCircle(enemy.x, enemy.y, enemy.size, fill='red')
+
+def drawBullets(app):
+    for bullet in app.playerShip.bullets:
+        drawOval(bullet[0], bullet[1], 3, 6, fill='blue')
+    for ship in app.enemyShips.enemies:
+        for bullet in ship.bullets:
+            drawOval(bullet[0], bullet[1], 3, 6, fill='orange')
+
+def onMouseMove(app, mouseX, mouseY):
+    app.playerShip.x = mouseX
+    app.playerShip.y = mouseY
+
+def onStep(app):
+    app.onStepCounter += 1
+    if app.gamemode == 1:
+        onStepMode1(app)
+    if app.gamemode == 2:
+        onStepMode2(app)
+
+def onStepMode1(app):
+    #enemy movement
+    for enemy in app.enemyShips.enemies: #move the enemies
+        enemy.move()
+        if enemy.y < app.height/5:
+            enemy.y += 2
+        #enemy bullet movement
+        enemy.moveBullets()
+        if app.onStepCounter%15==0:
+            enemy.addBullets()
+    if app.onStepCounter%200==0: #spawn new enemies
+        app.enemyShips.addEnemy(app.width/2, -20, 10)
+    #player bullet movement
+    app.playerShip.moveBullets()
+    if app.onStepCounter%15==0:
+        app.playerShip.addBullets()
+
+def onStepMode2(app):
+    pass
+
+def onKeyPress(app, key):
+    if key == '1': app.gamemode = 1
+    if key == '2': app.gamemode = 2
+    if key == '3': app.gamemode = 3
+
+def onMousePress(app, mouseX, mouseY):
+    pass
+
+def main():
+    runApp(width=600, height=1000)
+
+main()
