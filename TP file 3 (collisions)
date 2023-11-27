@@ -1,0 +1,327 @@
+from cmu_graphics import *
+import math
+import random
+
+class Buttons:
+    def __init__(self, app):
+        self.buttonLabels = {0: 'Start! (Random Mode)', 1: 'Mode 1', 2: 'Mode 2', 
+                             3: 'Mode 3', 4: 'Instructions'}
+        self.buttonCoords = []
+    
+        for i in range(5):
+            topX, topY = 100, (i+1)*(app.height/8)
+            self.buttonCoords.append((topX, topY))
+    
+    def drawButtons(self):
+        for i in range(5):
+            drawRect(self.buttonCoords[i][0], self.buttonCoords[i][1], 400, 100, 
+                     fill=None, border='black')
+            drawLabel(self.buttonLabels[i], self.buttonCoords[i][0]+200, 
+                      self.buttonCoords[i][1]+50, bold=True, align='center')
+    
+    def returnMode(self, app, mouseX, mouseY):
+        for button in self.buttonCoords:
+            index = self.buttonCoords.index(button) 
+            if ((button[0] <= mouseX <= button[0]+400) and 
+            (button[1] <= mouseY <= button[1]+100)):
+                if index == 0: #get random mode
+                    app.gamemode = random.randint(1, 3)
+                elif index in range(1, 4):
+                    app.gamemode = index
+                elif index == 4: #draw instructions
+                    app.drawInstructions = True
+
+class Player:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+        self.bullets = []
+        self.bulletSpeed = 5
+        self.hits = 0
+        self.kills = 0
+        self.dead = False
+    
+    def addBullets(self, app):
+        if app.onStepCounter%5==0 and not self.dead:
+            self.bullets.append([self.x-7, self.y])
+            self.bullets.append([self.x+7, self.y])
+    
+    def moveBullets(self):
+        if self.kills>0 and self.kills%5==0: #handle acceleration
+            print(f'kills: {self.kills}')
+            self.bulletSpeed += 1
+        if not self.dead:
+            for bullet in self.bullets:
+                bullet[1] -= self.bulletSpeed
+    
+    def drawPlayer(self):
+        x1, y1 = self.x, self.y-12
+        x2, y2 = self.x+8, self.y+12
+        x3, y3 = self.x-8, self.y+12
+        if not self.dead:
+            drawPolygon(x1, y1, x2, y2, x3, y3, fill='green')
+    
+    def drawBullets(self, app):
+        if not self.dead:
+            for bullet in self.bullets:
+                if onScreen(app, bullet[0], bullet[1]):
+                    drawOval(bullet[0], bullet[1], 3, 6, fill='blue')
+    
+    def collision(self, app): # treating ship with a circular 'hitpoint' with r=8
+        for enemy in app.enemyShips.enemies:
+            for bullet in enemy.bullets:
+                if distance(bullet.x, bullet.y, self.x, self.y) <= 8:
+                    self.hits += 1
+                    enemy.bullets.remove(bullet)
+                    return True
+        if self.hits >= 10:
+            self.dead = True
+    
+    def drawCollision(self, app): # draw a collision as a circle for 1 second ???
+        pass
+        
+class Enemy:
+    def __init__(self, app, x, y):
+        self.x, self.y = x, y
+        self.moveRight = True
+        self.bullets = []
+        self.rotate = 0
+        self.health = 5
+        self.hits = 0
+        self.dead = False
+
+    def move(self, app):
+        if self.moveRight == True:
+            self.x += 1
+            if self.x >= 600: self.moveRight = False
+        if self.moveRight == False:
+            self.x -= 1
+            if self.x <= 0: self.moveRight = True
+        if self.y < app.height/5:
+            self.y += 2
+    
+    def addBullets(self):
+        self.bullets.append(Bullet(self.x-7, self.y))
+        self.bullets.append(Bullet(self.x+7, self.y))
+    
+    def drawBullets(self, app):
+        for bullet in self.bullets:
+            if onScreen(app, bullet.x, bullet.y):
+                drawOval(bullet.x, bullet.y, 3, 6, fill='orange', rotateAngle=bullet.rotate)
+    
+    def onStep(self, app): 
+        if app.gamemode == 1:
+            for bullet in self.bullets:
+                bullet.update1()
+        if app.gamemode == 2:
+            for bullet in self.bullets:
+                bullet.update2(app)
+        if app.gamemode == 3:
+            for bullet in self.bullets:
+                bullet.update3(app)
+
+        if app.onStepCounter%15 == 0 and not self.dead:
+            self.addBullets()  
+        self.move(app)
+        self.rotationAngle(app)
+
+    def collision(self, app):
+        for bullet in app.playerShip.bullets:
+            if distance(bullet[0], bullet[1], self.x, self.y) <= 8:
+                self.hits += 1
+                app.playerShip.bullets.remove(bullet)
+                return True
+        if self.hits >= self.health:
+            self.dead = True
+    
+    def rotationAngle(self, app):
+        y = app.playerShip.y-self.y
+        x = app.playerShip.x-self.x
+        if x==0:
+            self.rotate = 0
+        elif x!=0:
+            self.rotate = math.degrees(math.atan(y/x)+math.pi/2)
+        print(self.rotate)
+
+class Enemies:
+    def __init__(self, app):
+        self.enemies = []
+    
+    def addEnemy(self, app, enemyX, enemyY):
+        if app.gamemode==1:
+            enemyAddStep = 150
+        if app.gamemode==2:
+            enemyAddStep = 120
+        if app.gamemode==3:
+            enemyAddStep = 200
+        if app.onStepCounter%enemyAddStep==0:
+            self.enemies.append(Enemy(app, enemyX, enemyY))
+    
+    def drawEnemy(self):
+        for enemy in self.enemies:
+            x1, y1 = enemy.x, enemy.y+12
+            x2, y2 = enemy.x+8, enemy.y-12
+            x3, y3 = enemy.x-8, enemy.y-12
+            if not enemy.dead:
+                drawPolygon(x1, y1, x2, y2, x3, y3, fill='red', rotateAngle=enemy.rotate)
+    
+class Bullet: # for enemy bullets!
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+        self.speed = 4
+        self.direction = 1
+        self.angle = math.pi/4
+        self.rotate = 0
+    
+    def update1(self):
+        self.y += 3
+    
+    def update2(self, app):
+        self.rotate = self.direction*-45
+        if self.x >= app.width:
+            self.direction = -1
+        if self.x <= 0:
+            self.direction = 1
+        self.x += self.speed*self.direction
+        self.y += self.speed
+    
+    def update3(self, app): # homing
+        Xp, Yp = app.playerShip.x, app.playerShip.y
+        Xe, Ye = self.x, self.y
+        d = ((Xp-Xe)**2 + (Yp-Ye)**2)**0.5
+        Xmovement = self.speed*(Xp-Xe)/d
+        Ymovement = self.speed*(Yp-Ye)/d
+        self.x += Xmovement
+        self.y += Ymovement
+
+class Instructions:
+    def __init__(self):
+        self.instructions = '''INSTRUCTIONS: \n
+            To move your ship: the ship follows your mouse movement, \n 
+            so use your mouse to control the ship and \n
+            dodge enemy bullets. \n
+            Objective: in each level, the objective is to kill \n
+            all enemies in the level without dying yourself. \n
+            Your ship can take 10 hits. In each level, \n
+            the enemies will have different health. \n
+            To use special skill: every five kills, you will reload \n
+            your skill use quota. Press ‘space’ to use the skill and \n
+            clear the screen of enemies and bullets. \n
+            Press 'escape' to go back to main page.'''
+    
+    def drawInstructions(self, app):
+        numLines = len(self.instructions.splitlines())
+        for i in range(numLines):
+            drawLabel(self.instructions.splitlines()[i], app.width/2, 
+                      (app.height/(numLines+1))*(i+1), size=20, align='center')
+
+def onAppStart(app):
+    #app
+    app.onStepCounter = 0
+    app.paused = False
+    app.drawInstructions = False
+    app.instructions = Instructions()
+    app.gamemode = None
+    app.gameOver = False
+    app.buttons = Buttons(app)
+    #ships
+    app.playerShip = Player(app.width/2, app.height*(3/4))
+    app.enemyShips = Enemies(app)
+
+def redrawAll(app):
+    if app.gamemode==None and app.gameOver==False and app.drawInstructions==False:
+        drawStartScreen(app)
+
+    if app.drawInstructions == True:
+        drawInstructions(app)
+
+    if app.gamemode != None and app.drawInstructions == False:
+        drawPlayer(app)
+        drawEnemies(app)
+        drawBullets(app)
+    
+    if app.gameOver:
+        drawGameOver(app)
+
+def drawPlayer(app):
+    app.playerShip.drawPlayer()
+    app.playerShip.drawCollision(app)
+
+def drawEnemies(app):
+    app.enemyShips.drawEnemy()
+
+def drawBullets(app):
+    app.playerShip.drawBullets(app)
+    for enemy in app.enemyShips.enemies:
+        enemy.drawBullets(app)
+
+def drawStartScreen(app):
+    app.buttons.drawButtons()
+    
+def drawInstructions(app):
+    app.instructions.drawInstructions(app)
+
+def drawGameOver(app): # game over screen ?
+    drawLabel('Game Over!', app.width/2, app.height/2, size=40, bold=True)
+
+def onMouseMove(app, mouseX, mouseY):
+    app.playerShip.x = mouseX
+    app.playerShip.y = mouseY
+
+def onStep(app):
+    if app.gamemode != None and not app.paused:
+        app.onStepCounter += 1
+
+        for enemy in app.enemyShips.enemies:
+            enemy.onStep(app)
+
+        #spawn new enemies
+        app.enemyShips.addEnemy(app, app.width/2, -20)
+        
+        #player bullet movement
+        app.playerShip.addBullets(app)
+        app.playerShip.moveBullets()
+
+        #player collision
+        app.playerShip.collision(app)
+
+        #enemy collision
+        for enemy in app.enemyShips.enemies:
+            enemy.collision(app)
+    
+    #handling player death
+    if app.playerShip.dead == True:
+        app.gamemode = None
+        app.gameOver = True
+        app.paused = True
+
+def onKeyPress(app, key):
+    onAppStart(app)
+    if key == '1': 
+        app.gamemode = 1
+    if key == '2': 
+        app.gamemode = 2
+    if key == '3': 
+        app.gamemode = 3
+    if key == 'r':
+        app.gamemode = None
+    if key == 'escape':
+        onAppStart(app)
+    if key == 'p':
+        app.paused = True
+
+def onMousePress(app, mouseX, mouseY):
+    if not app.drawInstructions:
+        app.buttons.returnMode(app, mouseX, mouseY)
+
+def distance(x0, y0, x1, y1):
+    return ((x0-x1)**2 + (y0-y1)**2)**0.5
+
+def onScreen(app, x, y):
+    return (x < app.width+10 and y < app.height+10)
+
+def main():
+    runApp(width=600, height=1000)
+
+main()
