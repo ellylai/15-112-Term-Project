@@ -69,6 +69,7 @@ class Buttons:
         for i in range(5):
             drawRect(self.buttonCoords[i][0], self.buttonCoords[i][1], 400, 100, 
                      fill=None, border='yellow')
+            print(self.buttonCoords[i][0], self.buttonCoords[i][1])
             drawLabel(self.buttonLabels[i], self.buttonCoords[i][0]+200, 
                       self.buttonCoords[i][1]+50, size=24, font='orbitron', fill='yellow', bold=True, align='center')
     
@@ -118,7 +119,7 @@ class Player:
         self.y = y
         self.image = None
         self.rotate = 0
-        self.moveSpeed = 5
+        self.moveSpeed = 6
         self.bullets = []
         self.bulletSpeed = 5
         self.hits = 0
@@ -146,6 +147,8 @@ class Player:
     def moveBullets(self, app):
         for bullet in self.bullets:
             bullet.updatePlayer(app)
+            if not onScreen(app, bullet.x, bullet.y):
+                self.bullets.remove(bullet)
     
     def drawPlayer(self, app):
         if not self.dead and self.image != None:
@@ -185,7 +188,7 @@ class Player:
 class Enemy:
     def __init__(self, app, x, y):
         self.x, self.y = x, y
-        self.moveRight = True
+        self.moveRight = random.choice([True, False])
         self.bullets = []
         self.rotate = 0
         self.health = 5
@@ -195,7 +198,7 @@ class Enemy:
     def move(self, app):
         if self.moveRight == True:
             self.x += 1
-            if self.x >= 600: self.moveRight = False
+            if self.x >= 600: self.moveRight = not self.moveRight
         if self.moveRight == False:
             self.x -= 1
             if self.x <= 0: self.moveRight = True
@@ -227,6 +230,10 @@ class Enemy:
         self.move(app)
         self.rotationAngle(app)
 
+        for bullet in self.bullets:
+            if not onScreen(app, bullet.x, bullet.y):
+                self.bullets.remove(bullet)
+
     def collision(self, app):
         for bullet in app.playerShip.bullets:
             if distance(bullet.x, bullet.y, self.x, self.y) <= 8:
@@ -249,13 +256,13 @@ class Enemies:
     def __init__(self, app):
         self.enemies = []
         self.enemyCount = 0
-        self.enemiesToKill = 5
+        self.enemiesToKill = random.randint(5, 8)
     
     def addEnemy(self, app, enemyX, enemyY):
         if app.gamemode==1:
-            enemyAddStep = 150
+            enemyAddStep = 100
         elif app.gamemode==2:
-            enemyAddStep = 120
+            enemyAddStep = 100
         elif app.gamemode==3:
             enemyAddStep = 200
         if app.onStepCounter%enemyAddStep==0 and self.enemyCount < self.enemiesToKill:
@@ -283,7 +290,7 @@ class Bullet:
     def __init__(self, x, y):
         self.x = x
         self.y = y
-        self.speed = 4
+        self.speed = random.randint(3, 5)
         self.direction = random.choice([1, -1])
         self.xDir = None
         self.yDir = None
@@ -293,8 +300,8 @@ class Bullet:
     
     def update1(self):
         if 0 < self.onStepCounter < 20:
-            self.y += 60/(self.onStepCounter*2)
-        self.y += 3
+            self.y += (self.speed*20)/(self.onStepCounter*2)
+        self.y += self.speed
         self.onStepCounter += 1
     
     def update2(self, app):
@@ -304,8 +311,8 @@ class Bullet:
         if self.x <= 0:
             self.direction = 1
         if 0 < self.onStepCounter < 20:
-            self.x += 60/(self.onStepCounter*2)*self.direction
-            self.y += 60/(self.onStepCounter*2)
+            self.x += (self.speed*20)/(self.onStepCounter*2)*self.direction
+            self.y += (self.speed*20)/(self.onStepCounter*2)
         self.x += self.speed*self.direction
         self.y += self.speed
         self.onStepCounter += 1
@@ -321,9 +328,9 @@ class Bullet:
 
     def updatePlayer(self, app): # player bullets
         if self.xDir == None:
-            self.xDir = math.sin(math.radians(app.playerShip.rotate))*6
+            self.xDir = math.sin(math.radians(app.playerShip.rotate))*7
         if self.yDir == None:
-            self.yDir = math.cos(math.radians(app.playerShip.rotate))*6
+            self.yDir = math.cos(math.radians(app.playerShip.rotate))*7
         self.x += self.xDir
         self.y -= self.yDir
 
@@ -411,9 +418,16 @@ def drawInstructions(app):
 
 def drawGameOver(app): # game over screen ?
     drawLabel('Game Over!', app.width/2, app.height/2, size=40, fill='yellow', bold=True)
+    drawPlayAgain(app)
 
 def drawWin(app): #win screen
     drawLabel('You Won!', app.width/2, app.height/2, size=40, fill='yellow', bold=True)
+    drawPlayAgain(app)
+
+def drawPlayAgain(app):
+    drawLabel('Play Again', app.width/2, app.height-100, size=20, bold=True, 
+              fill='yellow', align='center')
+    drawRect(app.width/2, app.height-100, 400, 100, align='center', fill=None, border='yellow')
 
 def onMouseMove(app, mouseX, mouseY):
     app.playerShip.onMouseMove(app, mouseX, mouseY)
@@ -475,6 +489,10 @@ def onMousePress(app, mouseX, mouseY):
 
     elif app.gameState == 'hangar':
         app.buttons2.getShip(app, mouseX, mouseY)
+    
+    elif app.gameState == 'win' or app.gameState == 'game over':
+        if (app.width/2-200<=mouseX<=app.width/2+200) and (app.height-150<=mouseY<=app.height-50):
+            onAppStart(app)
 
 def distance(x0, y0, x1, y1):
     return ((x0-x1)**2 + (y0-y1)**2)**0.5
